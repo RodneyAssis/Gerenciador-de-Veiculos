@@ -4,9 +4,15 @@ import com.sergipetech.GerenciarVeiculos.dto.VeiculoDTO;
 import com.sergipetech.GerenciarVeiculos.models.Moto;
 import com.sergipetech.GerenciarVeiculos.models.Veiculo;
 import com.sergipetech.GerenciarVeiculos.repository.genetics.AbstractGenericRepository;
+import com.sergipetech.GerenciarVeiculos.repository.genetics.GenericRowMapper;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class MotoService extends AbstractGenericRepository<Moto, Integer> {
@@ -15,10 +21,35 @@ public class MotoService extends AbstractGenericRepository<Moto, Integer> {
         super(jdbcTemplate);
     }
 
+    public Optional<Moto> buscarPorId(Integer id) {
+        var moto = Optional.ofNullable(findById(id));
+        if (moto.isPresent() && moto.get().getFkVeiculo() != 0) {
+            moto = Optional.ofNullable(findByIdWithJoin(id));
+            return moto;
+        }
+        return Optional.ofNullable(moto.get());
+    }
+
+    public List<Moto> buscar() {
+        var lista = findAll();
+        List<Moto> motos = new ArrayList<>();
+        motos.addAll(lista);
+        return motos;
+    }
+
     public void salvar(VeiculoDTO veiculo) {
-        Integer idVeiculo = save("core.veiculo", "id",new Veiculo(veiculo.getMarca(), veiculo.getModelo(), veiculo.getFabricante(), veiculo.getCor(), veiculo.getAno(), veiculo.getPreco()));
+        Integer idVeiculo = save("core.veiculo", "id", new Veiculo(veiculo.getMarca(), veiculo.getModelo(), veiculo.getFabricante(), veiculo.getCor(), veiculo.getAno(), veiculo.getPreco()));
         save(getTableName(), null, new Moto(veiculo.getCilindrada(), idVeiculo));
 
+    }
+
+    public ResponseEntity<Moto> atualizarDadosMoto(VeiculoDTO veiculo) {
+        update(getTableName(), getIdColumn(), new Moto(veiculo.getId(), veiculo.getCilindrada()));
+        return null;
+    }
+
+    public void excluir(Integer id) {
+        deletebyId(id);
     }
 
     @Override
@@ -28,11 +59,36 @@ public class MotoService extends AbstractGenericRepository<Moto, Integer> {
 
     @Override
     protected RowMapper<Moto> getRowMapper() {
-        return null;
+        return new GenericRowMapper<>(Moto.class);
     }
 
     @Override
     protected String getIdColumn() {
         return "id_moto";
+    }
+
+    @Override
+    protected String getJoinColumn() {
+        return "id";
+    }
+
+    @Override
+    protected String getJoinForeignKey() {
+        return "fk_veiculo";
+    }
+
+    @Override
+    protected String getJoinTableName() {
+        return "core.veiculo";
+    }
+
+    @Override
+    public <T> int save(String tableName, String idColumn, T entity) {
+        return super.save(tableName, idColumn, entity);
+    }
+
+    @Override
+    public <T> int update(String tableName, String idColumn, T entity) {
+        return super.update(tableName, idColumn, entity);
     }
 }

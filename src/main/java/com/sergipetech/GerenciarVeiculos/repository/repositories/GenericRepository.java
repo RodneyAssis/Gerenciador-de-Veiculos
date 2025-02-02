@@ -7,9 +7,12 @@ public interface GenericRepository<T, ID> {
 
     List<T> findAll();
 
-    void save(T t);
+    <T> int save(String tableName, String idColumn, T entity);
+
+    <T> int update(String tableName, String idColumn, T entity);
 
     void deletebyId(ID id);
 
-    void update(T t);
+
+    T findByIdWithJoin(ID id);
 }

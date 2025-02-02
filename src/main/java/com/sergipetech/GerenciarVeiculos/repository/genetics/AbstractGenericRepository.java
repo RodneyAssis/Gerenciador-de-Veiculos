@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 
-import java.util.Arrays;
 import java.util.List;
 
 public abstract class AbstractGenericRepository<T, ID> implements GenericRepository<T, ID> {
@@ -31,45 +30,38 @@ public abstract class AbstractGenericRepository<T, ID> implements GenericReposit
 
     protected abstract String getIdColumn();
 
-    @Override
-    public void save(T entity) {
+    protected abstract String getJoinColumn();
 
-        throw new UnsupportedOperationException("Método save deve ser implementado na subclasse.");
-    }
+    protected abstract String getJoinForeignKey();
+
+    protected abstract String getJoinTableName();
 
     public <T> int save(String tableName, String idColumn, T entity) {
         Class<?> clazz = entity.getClass();
         Field[] fields = clazz.getDeclaredFields();
 
-        // Obtendo os nomes das colunas e os placeholders (?, ?, ?)
-        String columns = Arrays.stream(fields)
-                .filter(field ->!"id".equals(field.getName()))
-                .map(field ->camelToSnake(field.getName()))
-                .collect(Collectors.joining(", "));
 
-        String placeholders = Arrays.stream(fields)
-                .filter(field ->!"id".equals(field.getName()))
-                .map(f -> "?")
-                .collect(Collectors.joining(", "));
+        String columns = Arrays.stream(fields).filter(field -> !"id".equals(field.getName())).map(field -> camelToSnake(field.getName())).collect(Collectors.joining(", "));
 
-        // Construindo a Query SQL
+        String placeholders = Arrays.stream(fields).filter(field -> !"id".equals(field.getName())).map(f -> "?").collect(Collectors.joining(", "));
+
         String sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + placeholders + ")";
 
         // Obtendo os valores dos campos do objeto
-        Object[] values = Arrays.stream(fields)
-                .filter(field ->!"id".equals(field.getName()))
-                .map(field -> {
-                    field.setAccessible(true);
-                    try {
-                        return field.get(entity);
-                    } catch (IllegalAccessException e) {
-                        throw new RuntimeException("Erro ao acessar o campo: " + field.getName(), e);
-                    }
-                }).toArray();
+        Object[] values = Arrays.stream(fields).filter(field -> !"id".equals(field.getName())).map(field -> {
+            field.setAccessible(true);
+            try {
+                return field.get(entity);
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException("Erro ao acessar o campo: " + field.getName(), e);
+            }
+        }).toArray();
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
-        if (idColumn != null){
+
+        if (idColumn != null) {
+            // Salvando registros no bando e retornando o id
             jdbcTemplate.update(connection -> {
                 PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
                 for (int i = 0; i < values.length; i++) {
@@ -88,6 +80,47 @@ public abstract class AbstractGenericRepository<T, ID> implements GenericReposit
         return 0;
     }
 
+    public <T> int update(String tableName, String idColumn, T entity) {
+        Class<?> clazz = entity.getClass();
+        Field[] fields = clazz.getDeclaredFields();
+
+
+        String setClause = Arrays.stream(fields)
+                .map(field -> camelToSnake(field.getName()) + " = ?") // Converte camelCase para snake_case
+                .collect(Collectors.joining(", "));
+
+        String sql = "UPDATE " + tableName + " SET " + setClause + " WHERE " + camelToSnake(idColumn) + " = ?";
+
+        // Obtém os valores dos campos da entidade (exceto o ID)
+        Object[] values = Arrays.stream(fields) // Ignora o campo ID
+                .map(field -> {
+                    field.setAccessible(true); // Permite acesso a campos privados
+                    try {
+                        return field.get(entity); // Obtém o valor do campo
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException("Erro ao acessar o campo: " + field.getName(), e);
+                    }
+                }).toArray();
+
+        // Obtém o valor do ID da entidade
+        Object idValue = Arrays.stream(fields).filter(field -> idColumn.equals(field.getName())) // Encontra o campo ID
+                .map(field -> {
+                    field.setAccessible(true); // Permite acesso a campos privados
+                    try {
+                        return field.get(entity); // Obtém o valor do ID
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException("Erro ao acessar o campo ID: " + field.getName(), e);
+                    }
+                }).findFirst().orElseThrow(() -> new RuntimeException("Campo ID não encontrado na entidade."));
+
+        // Adiciona o valor do ID ao array de valores
+        Object[] allValues = Arrays.copyOf(values, values.length + 1);
+        allValues[values.length] = idValue;
+
+        // Executa a query de atualização
+        return jdbcTemplate.update(sql, allValues);
+    }
+
     private String camelToSnake(String field) {
         StringBuilder snakeCaseString = new StringBuilder();
         char[] chars = field.toCharArray();
@@ -102,10 +135,6 @@ public abstract class AbstractGenericRepository<T, ID> implements GenericReposit
         return snakeCaseString.toString();
     }
 
-    @Override
-    public void update(T entity) {
-        throw new UnsupportedOperationException("Método update deve ser implementado na subclasse.");
-    }
 
     @Override
     public void deletebyId(ID id) {
@@ -121,7 +150,17 @@ public abstract class AbstractGenericRepository<T, ID> implements GenericReposit
 
     @Override
     public List<T> findAll() {
-        String sql = "SELECT * FROM " + getTableName();
+        String sql = "SELECT * FROM " + getTableName() + " t " +
+                "JOIN " + getJoinTableName() + " jt ON jt." + getJoinColumn() + " = t." + getJoinForeignKey();
         return jdbcTemplate.query(sql, getRowMapper());
+    }
+
+    @Override
+    public T findByIdWithJoin(ID id) {
+        String sql = "SELECT * FROM " + getTableName() + " t " +
+                "JOIN " + getJoinTableName() + " jt ON jt." + getJoinColumn() + " = t." + getJoinForeignKey() +
+                " WHERE t." + getIdColumn() + " = ?";
+
+        return jdbcTemplate.queryForObject(sql, getRowMapper(), id);
     }
 }
