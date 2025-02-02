@@ -1,6 +1,5 @@
-package com.sergipetech.GerenciarVeiculos.repository.genetics;
+package com.sergipetech.GerenciarVeiculos.repository.repositories;
 
-import java.io.Serializable;
 import java.util.List;
 
 public interface GenericRepository<T, ID> {
