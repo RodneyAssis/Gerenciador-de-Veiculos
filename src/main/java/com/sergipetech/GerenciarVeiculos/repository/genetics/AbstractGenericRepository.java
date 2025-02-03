@@ -164,13 +164,6 @@ public abstract class AbstractGenericRepository<T, ID> implements GenericReposit
         return snakeCaseString.toString();
     }
 
-
-    @Override
-    public void deletebyId(ID id) {
-        String sql = "DELETE FROM " + getTableName() + " WHERE " + getIdColumn() + " = ?";
-        jdbcTemplate.update(sql, id);
-    }
-
     @Override
     public T findById(ID id) {
         String sql = "SELECT * FROM " + getTableName() + " WHERE " + getIdColumn() + " = ?";
