@@ -14,6 +14,9 @@ public class VeiculoDTO {
     private String tipoCombustivel;
     private String cilindrada;
 
+    public VeiculoDTO() {
+    }
+
     public VeiculoDTO(String fabricante, String modelo, String marca, Integer ano, String cor, Double preco, String categoria, Integer quantidadePortas, String tipoCombustivel, String cilindrada) {
         this.fabricante = fabricante;
         this.modelo = modelo;

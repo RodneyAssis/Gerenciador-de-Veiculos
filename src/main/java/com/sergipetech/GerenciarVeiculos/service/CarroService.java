@@ -1,14 +1,18 @@
 package com.sergipetech.GerenciarVeiculos.service;
 
+import com.sergipetech.GerenciarVeiculos.dto.TipoCategoriaEnum;
 import com.sergipetech.GerenciarVeiculos.dto.VeiculoDTO;
 import com.sergipetech.GerenciarVeiculos.models.Carro;
+import com.sergipetech.GerenciarVeiculos.models.Moto;
 import com.sergipetech.GerenciarVeiculos.models.Veiculo;
 import com.sergipetech.GerenciarVeiculos.repository.genetics.AbstractGenericRepository;
 import com.sergipetech.GerenciarVeiculos.repository.genetics.GenericRowMapper;
+import org.springframework.beans.BeanUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,8 +23,16 @@ public class CarroService extends AbstractGenericRepository<Carro, Integer> {
         super(jdbcTemplate);
     }
 
-    public List<Carro> buscar() {
-        return findAll();
+    public List<VeiculoDTO> buscar() {
+        var lista = findAll();
+        List<VeiculoDTO> veiculos = new ArrayList<>();
+        for (Carro carro : lista) {
+            VeiculoDTO veiculoDTO = new VeiculoDTO();
+            BeanUtils.copyProperties(carro, veiculoDTO);
+            veiculoDTO.setCategoria(TipoCategoriaEnum.Carro);
+            veiculos.add(veiculoDTO);
+        }
+        return veiculos;
     }
 
     public Optional<Carro> buscarPorId(Integer id) {
@@ -37,14 +49,11 @@ public class CarroService extends AbstractGenericRepository<Carro, Integer> {
         save(getTableName(), null, new Carro(veiculo.getQuantidadePortas(), veiculo.getTipoCombustivel(), idVeiculo));
     }
 
-    @Override
-    protected String getTableName() {
-        return "comum.carro";
+    public void atualizarDadosCarro(VeiculoDTO veiculoDTO) {
     }
 
-    @Override
-    protected RowMapper<Carro> getRowMapper() {
-        return new GenericRowMapper<>(Carro.class);
+    public void excluir(Integer id) {
+        deletebyId(id);
     }
 
     @Override
@@ -63,10 +72,18 @@ public class CarroService extends AbstractGenericRepository<Carro, Integer> {
     }
 
     @Override
+    protected String getTableName() {
+        return "comum.carro";
+    }
+
+    @Override
     protected String getJoinTableName() {
         return "core.veiculo";
     }
 
-    public void atualizarDadosCarro(VeiculoDTO veiculoDTO) {
+    @Override
+    protected RowMapper<Carro> getRowMapper() {
+        return new GenericRowMapper<>(Carro.class);
     }
+
 }

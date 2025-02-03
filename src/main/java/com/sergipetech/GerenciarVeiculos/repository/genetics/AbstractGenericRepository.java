@@ -1,6 +1,8 @@
 package com.sergipetech.GerenciarVeiculos.repository.genetics;
 
 import com.sergipetech.GerenciarVeiculos.repository.repositories.GenericRepository;
+import jakarta.persistence.Column;
+import jakarta.persistence.Id;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -9,6 +11,7 @@ import org.springframework.jdbc.support.KeyHolder;
 import java.lang.reflect.Field;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -80,46 +83,72 @@ public abstract class AbstractGenericRepository<T, ID> implements GenericReposit
         return 0;
     }
 
-    public <T> int update(String tableName, String idColumn, T entity) {
+    public <T> int update(String tableName, T entity) {
         Class<?> clazz = entity.getClass();
-        Field[] fields = clazz.getDeclaredFields();
+        List<Field> fields = new ArrayList<>();
 
+        // Percorre toda a hierarquia da classe (incluindo superclasse)
+        while (clazz != null) {
+            fields.addAll(Arrays.asList(clazz.getDeclaredFields()));
+            clazz = clazz.getSuperclass();
+        }
 
-        String setClause = Arrays.stream(fields)
-                .map(field -> camelToSnake(field.getName()) + " = ?") // Converte camelCase para snake_case
-                .collect(Collectors.joining(", "));
+        // Obtém o campo ID automaticamente (assumindo que a anotação @Id é usada)
+        Field idField = fields.stream()
+                .filter(field -> field.isAnnotationPresent(Id.class)) // Verifica se há anotação @Id
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Campo ID não encontrado na entidade."));
 
-        String sql = "UPDATE " + tableName + " SET " + setClause + " WHERE " + camelToSnake(idColumn) + " = ?";
+        String idColumn = idField.isAnnotationPresent(Column.class) ?
+                idField.getAnnotation(Column.class).name() : camelToSnake(idField.getName());
 
-        // Obtém os valores dos campos da entidade (exceto o ID)
-        Object[] values = Arrays.stream(fields) // Ignora o campo ID
-                .map(field -> {
-                    field.setAccessible(true); // Permite acesso a campos privados
+        List<Field> nonNullFields = fields.stream()
+                .filter(field -> {
+                    field.setAccessible(true);
                     try {
-                        return field.get(entity); // Obtém o valor do campo
+                        return field.get(entity) != null; // Mantém apenas os campos com valor
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException("Erro ao acessar o campo: " + field.getName(), e);
                     }
-                }).toArray();
+                })
+                .collect(Collectors.toList());
 
-        // Obtém o valor do ID da entidade
-        Object idValue = Arrays.stream(fields).filter(field -> idColumn.equals(field.getName())) // Encontra o campo ID
+        // Constrói a cláusula SET apenas com os campos não nulos
+        String setClause = nonNullFields.stream()
                 .map(field -> {
-                    field.setAccessible(true); // Permite acesso a campos privados
-                    try {
-                        return field.get(entity); // Obtém o valor do ID
-                    } catch (IllegalAccessException e) {
-                        throw new RuntimeException("Erro ao acessar o campo ID: " + field.getName(), e);
-                    }
-                }).findFirst().orElseThrow(() -> new RuntimeException("Campo ID não encontrado na entidade."));
+                    Column columnAnnotation = field.getAnnotation(Column.class);
+                    String columnName = (columnAnnotation != null) ? columnAnnotation.name() : camelToSnake(field.getName());
+                    return columnName + " = ?";
+                })
+                .collect(Collectors.joining(", "));
 
-        // Adiciona o valor do ID ao array de valores
+        String sql = "UPDATE " + tableName + " SET " + setClause + " WHERE " + idColumn + " = ?";
+
+        // Obtém os valores dos campos não nulos
+        Object[] values = nonNullFields.stream()
+                .map(field -> {
+                    try {
+                        return field.get(entity);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException("Erro ao acessar o campo: " + field.getName(), e);
+                    }
+                })
+                .toArray();
+
+        idField.setAccessible(true);
+        Object idValue;
+        try {
+            idValue = idField.get(entity);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Erro ao acessar o campo ID", e);
+        }
+
         Object[] allValues = Arrays.copyOf(values, values.length + 1);
         allValues[values.length] = idValue;
 
-        // Executa a query de atualização
         return jdbcTemplate.update(sql, allValues);
     }
+
 
     private String camelToSnake(String field) {
         StringBuilder snakeCaseString = new StringBuilder();

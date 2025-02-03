@@ -9,7 +9,7 @@ public interface GenericRepository<T, ID> {
 
     <T> int save(String tableName, String idColumn, T entity);
 
-    <T> int update(String tableName, String idColumn, T entity);
+    <T> int update(String tableName, T entity);
 
     void deletebyId(ID id);
 

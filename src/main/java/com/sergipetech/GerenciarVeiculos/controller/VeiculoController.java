@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,14 +28,22 @@ public class VeiculoController {
         this.carroService = carroService;
     }
 
+    @GetMapping("/veiculos")
+    public ResponseEntity<List<VeiculoDTO>> findAll() {
+        List<VeiculoDTO> listAll = new ArrayList<>();
+        listAll.addAll(motoService.buscar());
+        listAll.addAll(carroService.buscar());
+        return ResponseEntity.ok().body(listAll);
+    }
+
     @GetMapping("/moto/listar")
-    public ResponseEntity<List<Moto>> listarMoto() {
+    public ResponseEntity<List<VeiculoDTO>> listarMoto() {
         return ResponseEntity.ok().body(motoService.buscar());
 
     }
 
     @GetMapping("/carro/listar")
-    public ResponseEntity<List<Carro>> listarCarros() {
+    public ResponseEntity<List<VeiculoDTO>> listarCarros() {
         return ResponseEntity.ok().body(carroService.buscar());
     }
 
@@ -69,7 +78,7 @@ public class VeiculoController {
     }
 
     @PutMapping("/atualizar")
-    public ResponseEntity<?> alterarMoto(@RequestBody VeiculoDTO veiculoDTO) {
+    public ResponseEntity<?> atualizar(@RequestBody VeiculoDTO veiculoDTO) {
         if (veiculoDTO.getCategoria().equals(TipoCategoriaEnum.Moto)) {
             motoService.atualizarDadosMoto(veiculoDTO);
             return ResponseEntity.ok().build();
@@ -88,7 +97,7 @@ public class VeiculoController {
 
     @DeleteMapping("/carro/{id}")
     public ResponseEntity<?> excluirCarro(@PathVariable("id") Integer id) {
-        motoService.excluir(id);
+        carroService.excluir(id);
         return ResponseEntity.ok().body("Conteudo Excluido com sucesso:" + id);
     }
 }
