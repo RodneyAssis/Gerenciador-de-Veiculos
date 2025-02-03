@@ -192,4 +192,21 @@ public abstract class AbstractGenericRepository<T, ID> implements GenericReposit
 
         return jdbcTemplate.queryForObject(sql, getRowMapper(), id);
     }
+
+    @Override
+    public void deletebyId(ID id) {
+        String sqlDeleteChildren = "DELETE FROM " + getJoinTableName() +
+                " WHERE " + getJoinColumn() + " IN (" +
+                "SELECT " + getJoinForeignKey() + " FROM " + getTableName() +
+                " WHERE " + getIdColumn() + " = ?)";
+
+        jdbcTemplate.update(sqlDeleteChildren, id);
+
+
+        String sqlDeleteParent = "DELETE FROM " + getTableName() +
+                " WHERE " + getIdColumn() + " = ?";
+
+        jdbcTemplate.update(sqlDeleteParent, id);
+
+    }
 }
